@@ -1,0 +1,3 @@
+# ANSI 成品是 Big5 + CRLF，絕對不能被 git 正規化行尾
+*.ans -text -diff
+*.ans linguist-language=Text
