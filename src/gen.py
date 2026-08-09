@@ -4,7 +4,7 @@
 """
 import os, unicodedata
 
-W, H = 78, 18          # 地圖區
+W, H = 78, 17          # 地圖區（2026/08/09：18→17 列，讓每格壓到 21 行內容）
 LAT_TOP, LAT_STEP = 34.0, 1.1        # row 0 = 34.0N
 LON_L,  LON_STEP = 112.0, 0.55       # col 0 = 112.0E
 
@@ -502,8 +502,7 @@ for c in (15, 35, 55):
 cv.put(15, 10, '跳！', C_GAG)
 cv.put(15, 30, '又跳？', C_GAG)
 cv.put(15, 50, '（等等還有第三次）', C_NOTE)
-cv.put(16, 4, '上下擺動＝雙眼牆造成的擺線運動　　左右前進＝真正的導引方向', C_NOTE)
-cv.put(17, 4, '兩件事要分開看：晃的是中心，走的是主軌道。', C_NOTE)
+cv.put(16, 4, '上下擺動＝擺線運動；左右前進＝導引方向。晃的是中心，走的是主軌道。', C_NOTE)
 add('4-4', 4, A4, cv,
     '氣象人叫它擺線；鄉民叫它海豚跳。',
     '',
@@ -832,21 +831,23 @@ json.dump([{k: (v if k != 'cv' else None) for k, v in f.items()} | {'lines': l}
 # .ans 輸出
 for i, f in enumerate(FRAMES, 1):
     body = f['cv'].ansi()
-    out = ['\033[m\033[1;36m' + f['title'] + '\033[m']
-    out += body
-    # 2026/08/08：PTT 內容區只有 23 行（第 24 行是狀態列），
-    # 所以把「分隔線」與「進度條」併成同一行 —— 一格 = 一畫面才對得齊。
+    # 2026/08/09：PTT 每頁可見 23 行，但每次只前進 22 行 ——
+    # 上一頁的最後一行會變成下一頁的第一行。所以一格＝21 行內容＋1 行共用空行，
+    # 那行空白同時是本格的結尾與下一格畫面的頂端，重疊處看不出來。
+    # 原本獨立的標題列併進進度條，省下的一行還給地圖以外的版面。
+    out = ['\033[m' + body[0]] + body[1:]        # 地圖 17 列
     n = f['act']
-    _tag = {9: '片尾', 10: '彩蛋'}.get(n, '第%d幕/8' % n)
     _b = min(n, 8)
-    _label = '  %s  %s ' % (_tag, f['id'])
+    _label = '  %s  %s ' % (f['title'], f['id'])
     _used = (_b + 8) + dispw(_label)          # ▓ 佔 2 欄、- 佔 1 欄
     out.append('\033[1;33m' + '▓' * _b + '\033[1;30m' + '-' * (8 - _b) +
-               _label + '-' * max(0, 78 - _used) + '\033[m')
+               '\033[1;36m' + _label + '\033[1;30m' +
+               '-' * max(0, 78 - _used) + '\033[m')
     out.append('\033[1;37m' + f['sub'] + '\033[m')
     _c2 = '1;33' if f['sub2'].startswith(('主播', '實況')) else '1;37'
     out.append('\033[%sm' % _c2 + f['sub2'] + '\033[m')
     out.append('\033[1;30m' + f['note'] + '\033[m')
+    out.append('')                            # ← 與下一格共用的邊界空行
     open('ans/%02d_%s.ans' % (i, f['id'].replace('-', '_')), 'w',
          encoding='cp950', errors='replace', newline='').write(
              '\r\n'.join(out) + '\r\n' * 3)

@@ -3,9 +3,9 @@
 用法：python check_ans.py
 檢查項目：
   1. 每格欄寬 ≤ 80（PTT 終端機上限）
-  2. 每格行數 = 24（一個 PTT 畫面）
+  2. 每格行數 = 22（21 行內容 ＋ 1 行與下一格共用的空行）
   3. 全部字元可用 Big5(cp950) 編碼
-  4. ptt_全片串接.ans ＋ PTT 標頭 3 行後，總行數是 23 的整數倍
+  4. ptt_全片串接.ans ＋ PTT 標頭 4 行後，總行數是 22（翻頁步長）的整數倍
   5. holds.json 與 ans/ 檔數一致，並印出總片長
   6. 故事稿 md 的逐格草稿也不超過 78 欄、code fence 成對
 任何一項失敗 → 非 0 離開碼。
@@ -13,8 +13,12 @@
 import glob, json, os, re, sys
 
 ESC = re.compile('\x1b\\[[0-9;]*m')
-ROWS = 23      # PTT 內容區只有 23 行（第 24 行是狀態列）
-PTT_HEAD = 3   # PTT 文章自動加的「作者／標題／時間」三行
+# 2026/08/09 依實貼 PTT 的行號校準：
+#   每頁可見 23 行，但翻頁只前進 22 行（上一頁最後一行＝下一頁第一行）
+#   所以一格 = 21 行內容 ＋ 1 行共用空行 = 22 行
+ROWS = 22      # 每格檔案行數（含結尾那行共用空行）
+STEP = 22      # PTT 每次翻頁前進的行數
+PTT_HEAD = 4   # PTT 文章標頭（作者／標題／時間＋分隔線）
 MAXW = 80
 FAIL = []
 
@@ -53,7 +57,7 @@ def main():
     for f in files:
         raw = open(f, encoding='cp950', newline='').read()
         lines = raw.split('\r\n')
-        while lines and lines[-1] == '':
+        while len(lines) > ROWS and lines[-1] == '':   # 只丟檔尾終止符，保留共用空行
             lines.pop()
         heights.add(len(lines))
         check(len(lines) == ROWS, '%s 行數 %d ≠ %d' % (f, len(lines), ROWS))
@@ -74,13 +78,13 @@ def main():
     pages = 0
     if check(os.path.exists(cat), '找不到 %s' % cat):
         L = open(cat, encoding='cp950', newline='').read().split('\r\n')
-        while L and L[-1] == '':
-            L.pop()
-        pages = (len(L) + PTT_HEAD) / ROWS
-        check((len(L) + PTT_HEAD) % ROWS == 0,
+        if L and L[-1] == '':
+            L.pop()          # 只丟一個檔尾終止符；最後一格的共用空行要留著算數
+        pages = (len(L) + PTT_HEAD) / STEP
+        check((len(L) + PTT_HEAD) % STEP == 0,
               '%s：貼上 PTT 後總行數 %d（含標頭 %d 行）不是 %d 的整數倍'
               '——翻頁會對不齊，用 make_ptt.py --lead 調整封面卡'
-              % (cat, len(L) + PTT_HEAD, PTT_HEAD, ROWS))
+              % (cat, len(L) + PTT_HEAD, PTT_HEAD, STEP))
         check(len(L) >= len(files) * ROWS,
               '%s 行數 %d 少於 %d 格 × %d' % (cat, len(L), len(files), ROWS))
         for n, ln in enumerate(L, 1):

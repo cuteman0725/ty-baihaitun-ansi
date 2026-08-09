@@ -147,7 +147,7 @@ kbd{background:#222a36;border:1px solid var(--line);border-radius:4px;padding:1p
 </style></head><body>
 <header><div class="wrap">
 <h1>2613 白海豚：一隻不肯往北游的海豚</h1>
-<div class="sub">PTT / BePTT ANSI 短劇預覽　v3.0　·　8 幕＋片尾＋彩蛋　33 格　·　約 31 秒　·　78 欄 × 23 行<br>
+<div class="sub">PTT / BePTT ANSI 短劇預覽　v3.0　·　8 幕＋片尾＋彩蛋　33 格　·　78 欄 × 21 行　·　預設約 78 秒（原稿節奏 31 秒 × 2.5）<br>
 北方三番兩次想把白海豚拐走，結果每次都失敗——牠不是跳一下，就是晃一下，然後若無其事繼續往西。</div>
 </div></header>
 <div class="wrap">
@@ -160,16 +160,19 @@ kbd{background:#222a36;border:1px solid var(--line);border-radius:4px;padding:1p
     <button id="prev">◀ 上一格</button>
     <button id="next">下一格 ▶</button>
     <button id="rst">⟲ 重頭</button>
-    <label style="color:var(--dim);font-size:13px">速度
-      <input type="range" id="spd" min="0.3" max="2.5" step="0.1" value="1"></label>
+    <label style="color:var(--dim);font-size:13px">停留
+      <input type="range" id="spd" min="0.5" max="5" step="0.25" value="2.5">
+      <b id="spdv" style="color:var(--acc);font-weight:600;white-space:nowrap"></b></label>
     <span class="meta" id="meta"></span>
   </div>
   <div class="track" id="track"></div>
   <div class="note">
     <span class="kb">鍵盤：<kbd>空白鍵</kbd> 播放／暫停　<kbd>←</kbd><kbd>→</kbd> 逐格　<kbd>R</kbd> 重頭。<br></span>
     輕觸畫面左／右半邊可以往前／往後一格；點進度條任一段可跳到該格。<br>
+    預設每格停留原稿的 <b>2.5 倍</b>（全片約 78 秒），這樣三行字幕才讀得完；
+    滑桿往左拉＝變快，往右拉＝更慢。<br>
     這頁只是預覽用；真正貼 PTT 的是 <code>ans/*.ans</code>（Big5 + CRLF）或
-    <code>ptt_全片串接.ans</code>（封面卡 ＋ 33 格 × <b>23 行</b>——PTT 最下面一行是狀態列，內容區只有 23 行）。
+    <code>ptt_全片串接.ans</code>（封面卡 ＋ 33 格 × <b>22 行</b>——PTT 每頁可見 23 行但只前進 22 行，上一頁最後一行會變成下一頁第一行，所以每格是 21 行內容＋1 行共用空白）。
   </div>
 </div>
 <script>
@@ -213,20 +216,20 @@ function fitWidth(){
 addEventListener('resize', fitWidth);
 addEventListener('orientationchange', () => setTimeout(fitWidth, 200));
 
-let i = 0, timer = null, rate = 1;
+let i = 0, timer = null, mult = 2.5;   // 停留倍率：往右拉＝每格停久一點
 const scr = document.getElementById('scr'), meta = document.getElementById('meta');
 const track = document.getElementById('track');
 F.forEach((f, k) => { const b = document.createElement('b');
   b.onclick = () => { stop(); show(k); }; track.appendChild(b); });
 const bars = [...track.children];
 function show(k){ i = k; scr.innerHTML = F[k].html;
-  meta.textContent = `第 ${k+1} / ${F.length} 格　${F[k].id}　停留 ${F[k].hold}s`;
+  meta.textContent = `第 ${k+1} / ${F.length} 格　${F[k].id}　停留 ${(F[k].hold*mult).toFixed(1)}s`;
   bars.forEach((b, j) => { b.className = j < k ? 'on' : (j === k ? 'act' : ''); }); }
+const ms = k => F[k].hold * 1000 * mult;
 function step(){ show((i + 1) % F.length);
-  if (i === F.length - 1){ timer = setTimeout(() => { stop(); }, F[i].hold * 1000 / rate); }
-  else timer = setTimeout(step, F[i].hold * 1000 / rate); }
+  timer = setTimeout(i === F.length - 1 ? stop : step, ms(i)); }
 function play(){ if (timer) return; document.getElementById('play').textContent = '❚❚ 暫停';
-  timer = setTimeout(step, F[i].hold * 1000 / rate); }
+  timer = setTimeout(step, ms(i)); }
 function stop(){ clearTimeout(timer); timer = null;
   document.getElementById('play').textContent = '▶ 播放'; }
 document.getElementById('play').onclick = () => timer ? stop() : play();
@@ -237,7 +240,14 @@ document.getElementById('tapR').onclick = () => { stop(); show((i + 1) % F.lengt
 show(0);
 fitWidth();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitWidth); };
-document.getElementById('spd').oninput = e => { rate = +e.target.value; };
+const TOTAL = F.reduce((a, f) => a + f.hold, 0);
+function spdLabel(){
+  document.getElementById('spdv').textContent =
+    `×${mult}　全片 ${Math.round(TOTAL * mult)} 秒`;
+  show(i);
+}
+document.getElementById('spd').oninput = e => { mult = +e.target.value; spdLabel(); };
+spdLabel();
 addEventListener('keydown', e => {
   if (e.key === ' '){ e.preventDefault(); timer ? stop() : play(); }
   if (e.key === 'ArrowRight'){ stop(); show((i + 1) % F.length); }
